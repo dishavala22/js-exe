@@ -1,55 +1,36 @@
-const fs = require('fs');
-const {parse }= require('csv-parse');
+// que1.js
+const commonFunctions = require('./index');
 
-const path = './assets/googleplaystore.csv';
+// Extract command-line arguments
+const args = process.argv.slice(2); // Remove the first two elements (node and script name)
 
-function listApps(searchTerm) {
-  const readStream = fs.createReadStream(path);
-  const csvParser = parse({ delimiter: ',', columns: true });
+// Check if the --search option is provided
+const searchIndex = args.indexOf('--search');
+let searchQuery = null;
+if (searchIndex !== -1 && searchIndex + 1 < args.length) {
+    searchQuery = args[searchIndex + 1];
+}
 
-  readStream.pipe(csvParser);
-
-  let totalReviews = 0;
-  const filteredApps = [];
-
-  csvParser.on('data', function (row) {
-    try {
-      // Ensure that the row has the expected number of columns
-      if (Object.keys(row).length === 13) {
-        if (!searchTerm || row['App'].toLowerCase().includes(searchTerm.toLowerCase())) {
-          const reviews = parseInt(row['Reviews'], 10) || 0;
-          totalReviews += reviews;
-          filteredApps.push({ name: row['App'], reviews });
-        }
-      } else {
-        console.error('Invalid number of columns in CSV record:', row);
-      }
-    } catch (error) {
-      console.error('Error processing CSV record:', error.message);
+// Read data from the CSV file using the common function
+commonFunctions.readDataFromCSV('./assets/googleplaystore.csv', function(error, data) {
+    if (error) {
+        console.error(error.message);
+        return;
     }
-  });
 
-  csvParser.on('error', function (error) {
-    console.error('Error parsing CSV:', error.message);
-  });
+    // Extract app names and reviews based on CSV structure
+    const appNames = data.map(entry => entry[0]); // Assuming app names are in the first column
+    const reviews = data.map(entry => entry[3]); // Assuming reviews are in the second column
 
-  csvParser.on('end', function () {
-    printResults(filteredApps, totalReviews);
-  });
-}
-
-function printResults(apps, totalReviews) {
-  apps.forEach(app => {
-    console.log(`${app.name}: ${app.reviews} reviews`);
-  });
-  console.log(`Total Reviews: ${totalReviews}`);
-}
-
-function readCommandLineArguments() {
-  const args = process.argv.slice(2);
-  const searchFlagIndex = args.indexOf('--search');
-  return searchFlagIndex !== -1 ? args.slice(searchFlagIndex + 1).join(' ') : null;
-}
-
-const searchTerm = readCommandLineArguments();
-listApps(searchTerm);
+    // If the --search option is provided, filter the data based on the app name
+    if (searchQuery) {
+        const searchResult = appNames
+            .map((appName, index) => ({ App: appName, Reviews: reviews[index] }))
+            .filter(entry => entry.App.toLowerCase().includes(searchQuery.toLowerCase()));
+        console.log(searchResult);
+    } else {
+        // Display all app names and review counts
+        const filteredData = appNames.map((appName, index) => ({ App: appName, Reviews: reviews[index] }));
+        console.log(filteredData);
+    }
+});
